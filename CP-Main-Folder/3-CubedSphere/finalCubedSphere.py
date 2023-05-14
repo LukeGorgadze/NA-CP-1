@@ -29,6 +29,12 @@ def cartesian_to_spherical(x, y, z):
         phi = np.arctan2(y, x) # longitude
         return theta, phi
 
+def spherical_to_cartesian(theta, phi, r):
+    x = r * np.sin(theta) * np.cos(phi)
+    y = r * np.sin(theta) * np.sin(phi)
+    z = r * np.cos(theta)
+    return x, y, z
+
 def CubedSphere(n, f, point):
     # Generate faces of the cube
     X = np.linspace(-1, 1, n)
@@ -70,7 +76,7 @@ def CubedSphere(n, f, point):
         distance = float('inf')
         closestPoint = None
         for face in cubeOrigin:
-            print(face,"\n")
+            # print(face,"\n")
             for row in face:
                 for point in row:
                     # print(point)
@@ -79,17 +85,25 @@ def CubedSphere(n, f, point):
                     if dist < distance:
                         distance = dist
                         closestPoint = point
+
+
         if dir == 'x':
-            return (f(closestPoint[0] + h, closestPoint[1]) - f(closestPoint[0], closestPoint[1])) / h
+            return (closestPoint,(f(closestPoint[0] + h, closestPoint[1],closestPoint[2]) - f(closestPoint[0], closestPoint[1],closestPoint[2])) / h)
         if dir == 'y':
-            return (f(closestPoint[0], closestPoint[1] + h) - f(closestPoint[0], closestPoint[1])) / h
+            return (closestPoint,(f(closestPoint[0], closestPoint[1] + h,closestPoint[2]) - f(closestPoint[0], closestPoint[1],closestPoint[2])) / h)
         else:
-            return None
+            return closestPoint
+        
 
-    print(computeDerivative(f, point, 'x', 0.0001))
-
+    closestPoint,value = computeDerivative(f, point, 'x', 0.0001)
+    print(value)
     # Draw the points of face in the cube
     fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
+    x = 1
+    y = 2
+    z = 3
+
+    ax.scatter(x, y, z, c='b', marker='o')
     for face in cubeOrigin:
         for row in face:
             # print(row,"row")
@@ -102,10 +116,9 @@ def CubedSphere(n, f, point):
     plt.show()
 
 
-def f(x, y): return np.exp(x) + np.exp(y) + np.cos(x) + np.sin(y)
+def f(x, y,z): return np.exp(x) + np.exp(y) + np.cos(x) + np.sin(y) + np.sin(z)
 
 print("---------")
 x,y,z = 0.5, 0.5, 0.5
 lat, longt = cartesian_to_spherical(x,y,z)
-print(f(lat,longt))
 CubedSphere(5, f, (lat, longt))
