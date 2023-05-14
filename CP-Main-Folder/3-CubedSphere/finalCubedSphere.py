@@ -2,12 +2,12 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 '''
-1.To construct a cubed sphere mesh, we first start with a cube whose faces are divided into a 
+To construct a cubed sphere mesh, we first start with a cube whose faces are divided into a 
 regular grid of points. We then map each point on the cube to a point on the surface of a sphere 
 inscribed inside the cube. This mapping preserves the regular grid structure and results in a mesh 
 with six square faces that are each divided into a regular grid of points. This mesh is known as the cubed sphere mesh.
 
-2.On a cubed sphere, we can compute the derivatives of f in the x, y, and z directions using the 
+2.On a cubed sphere, we can compute the partial derivatives of f using the 
 function values in nodal points only. These derivatives can be approximated using finite 
 difference schemes that involve the function values at neighboring points on the mesh.
 
@@ -21,7 +21,7 @@ we can compare the computed derivatives with the exact analytical solutions for 
 functions. For example, we could compute the gradient of a function that varies linearly 
 with x, y, and z and compare it to the exact analytical solution. We could also visualize 
 the convergence by plotting the computed derivatives as a function of the grid spacing and 
-comparing it to the expected rate of convergence.'''
+comparing it to the expected rate of convergence.1.'''
 
 def cartesian_to_spherical(x, y, z):
         r = np.sqrt(x**2 + y**2 + z**2)
@@ -72,13 +72,15 @@ def CubedSphere(n, f, point):
         return 2 * np.arcsin(np.sqrt(np.sin((p2[0] - p1[0]) / 2)**2 + np.cos(p1[0]) * np.cos(p2[0]) * np.sin((p2[1] - p1[1]) / 2)**2))
 
 
-    def computeDerivative(f, pointOrigin, dir, h):
+    def computeDerivative(f, pointOrigin, dir,n):
         distance = float('inf')
         closestPoint = None
+        prevPointX = None
+        prevPointY = None
         for face in cubeOrigin:
             # print(face,"\n")
-            for row in face:
-                for point in row:
+            for i,row in enumerate(face):
+                for j,point in enumerate(row):
                     # print(point)
                     lat, longt = cartesian_to_spherical(point[0], point[1], point[2])
                     dist = distanceEstimator(pointOrigin, (lat, longt))
@@ -87,23 +89,51 @@ def CubedSphere(n, f, point):
                         closestPoint = point
 
 
+        distance = float('inf')
+        offsetX = np.array([1/ n,0,0])
+        for face in cubeOrigin:
+            for i,row in enumerate(face):
+                for j,point in enumerate(row):
+                    dist = np.linalg.norm(point - closestPoint + offsetX)
+                    if dist < distance and (point != closestPoint).any():
+                        distance = dist
+                        prevPointX = point
+
+        distance = float('inf')
+        offsetY = np.array([0,1/ n,0])
+        for face in cubeOrigin:
+            for i,row in enumerate(face):
+                for j,point in enumerate(row):
+                    dist = np.linalg.norm(point - closestPoint + offsetY)
+                    if dist < distance and (point != closestPoint).any() and (point != prevPointX).any():
+                        distance = dist
+                        prevPointY = point
+
+        
+
         if dir == 'x':
-            return (closestPoint,(f(closestPoint[0] + h, closestPoint[1],closestPoint[2]) - f(closestPoint[0], closestPoint[1],closestPoint[2])) / h)
+            h = np.linalg.norm(closestPoint - prevPointX)
+            print("Partial derivative along x axis on nodal point")
+            return (closestPoint,prevPointX,prevPointY,(f(closestPoint[0], closestPoint[1],closestPoint[2]) - f(prevPointX[0],prevPointX[1],prevPointX[2])) / h)
         if dir == 'y':
-            return (closestPoint,(f(closestPoint[0], closestPoint[1] + h,closestPoint[2]) - f(closestPoint[0], closestPoint[1],closestPoint[2])) / h)
+            h = np.linalg.norm(closestPoint - prevPointY)
+            print("Partial derivative along y axis on nodal point")
+            return (closestPoint,prevPointX,prevPointY,(f(closestPoint[0], closestPoint[1],closestPoint[2]) - f(prevPointY[0],prevPointY[1],prevPointY[2])) / h)
         else:
             return closestPoint
         
 
-    closestPoint,value = computeDerivative(f, point, 'x', 0.0001)
+    closestPoint,prevPointX,prevPointY,value = computeDerivative(f, point, 'y',n)
     print(value)
     # Draw the points of face in the cube
     fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
-    x = 1
-    y = 2
-    z = 3
+    x = closestPoint[0]
+    y = closestPoint[1]
+    z = closestPoint[2]
 
     ax.scatter(x, y, z, c='b', marker='o')
+    ax.scatter(prevPointX[0],prevPointX[1],prevPointX[2], c='g', marker='o')
+    ax.scatter(prevPointY[0],prevPointY[1],prevPointY[2], c='yellow', marker='o')
     for face in cubeOrigin:
         for row in face:
             # print(row,"row")
@@ -116,9 +146,8 @@ def CubedSphere(n, f, point):
     plt.show()
 
 
-def f(x, y,z): return np.exp(x) + np.exp(y) + np.cos(x) + np.sin(y) + np.sin(z)
-
+def f(x, y,z): return x**2 + y**2 + z**2 + 60
 print("---------")
-x,y,z = 0.5, 0.5, 0.5
+x,y,z = 50,6,100
 lat, longt = cartesian_to_spherical(x,y,z)
-CubedSphere(5, f, (lat, longt))
+CubedSphere(50, f, (lat, longt))

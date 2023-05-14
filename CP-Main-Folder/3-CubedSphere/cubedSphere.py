@@ -1,77 +1,62 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from mpl_toolkits.mplot3d import Axes3D
 
-def cubed_sphere_mesh(n):
-    """
-    Constructs a cubed sphere mesh with n subdivisions.
-    Returns an array of shape (6*n**2, 3) containing the nodal points.
-    """
-    # Define the cube
-    x = np.linspace(-1, 1, n+1)
-    X, Y, Z = np.meshgrid(x, x, x)
+# Generate cubed sphere mesh
+n = 10  # number of grid points along each face
+m = 6*n**2  # total number of grid points
+theta = np.linspace(0, np.pi, n+1)[1:-1]  # exclude poles
+phi = np.linspace(0, 2*np.pi, n+1)[:-1]
+x, y = np.meshgrid(phi, theta)
+x = x.flatten()
+y = y.flatten()
+z = np.sqrt(1 - x**2 - y**2)
+xyz = np.vstack([np.concatenate([x, -x, -y, y, -z, z]),
+                 np.concatenate([y, -y, x, -x, -z, z]),
+                 np.concatenate([z, z, z, z, -x, -x])]).T
 
-    # Inscribe a sphere inside the cube
-    R = np.sqrt(X**2 + Y**2 + Z**2)
-    X /= R
-    Y /= R
-    Z /= R
+# Compute finite difference stencil for partial derivative
+h = np.sqrt(2/(n**2))  # mesh spacing
+D = np.zeros((m, m))
+for i in range(m):
+    xi = xyz[i,:]
+    for j in range(m):
+        xj = xyz[j,:]
+        if np.allclose(xi, xj):
+            continue  # ignore diagonal
+        xij = xj - xi
+        r = np.linalg.norm(xij)
+        if r > 2*h:
+            continue  # ignore points too far away
+        D[i,j] = np.dot(xij, np.array([1,2,3]))/(r**3)
 
-    # Project the vertices of the cube onto the sphere
-    xyz = np.vstack((X.flatten(), Y.flatten(), Z.flatten())).T
-    r = np.sqrt(xyz[:,0]**2 + xyz[:,1]**2 + xyz[:,2]**2)
-    theta = np.arccos(xyz[:,2]/r)
-    phi = np.arctan2(xyz[:,1], xyz[:,0])
-    nodal_points = np.vstack((theta, phi)).T
+# Define test function and analytical partial derivatives
+f = lambda x,y,z: np.sin(2*x)*np.cos(y)*z
+dfdx = lambda x,y,z: 2*np.cos(2*x)*np.cos(y)*z
+dfdy = lambda x,y,z: -np.sin(2*x)*np.sin(y)*z
+dfdz = lambda x,y,z: np.sin(2*x)*np.cos(y)
 
-    # Divide each square into smaller squares
-    for i in range(6):
-        for j in range(n):
-            for k in range(n):
-                idx = i*n**2 + j*n + k
-                p1 = nodal_points[idx]
-                p2 = nodal_points[idx+n]
-                p3 = nodal_points[idx+n+1]
-                p4 = nodal_points[idx+1]
-                theta = np.linspace(p1[0], p2[0], n+1)
-                phi = np.linspace(p1[1], p4[1], n+1)
-                for l in range(1,n):
-                    for m in range(1,n):
-                        nodal_points = np.vstack((nodal_points, [theta[l], phi[m]]))
+# Compute numerical partial derivatives for varying mesh spacing
+nhs = np.logspace(-2, -6, 10)  # array of mesh spacings
+errs = np.zeros_like(nhs)  # array of errors
+for i, h in enumerate(nhs):
+    Dh = D/h
+    vals = f(xyz[:,0], xyz[:,1], xyz[:,2])
+    dfdx_num = np.dot(Dh, vals)
+    dfdy_num = np.dot(Dh, vals)
+    dfdz_num = np.dot(Dh, vals)
+    dfdx_analytic = dfdx(xyz[:,0], xyz[:,1], xyz[:,2])
+    dfdy_analytic = dfdy(xyz[:,0], xyz[:,1], xyz[:,2])
+    dfdz_analytic = dfdz(xyz[:,0], xyz[:,1], xyz[:,2])
+    errs[i] = np.sqrt(np.mean((dfdx_num - dfdx_analytic)**2 +
+                               (dfdy_num - dfdy_analytic)**2 +
+                               (dfdz_num - dfdz_analytic)**2))
 
-    return nodal_points
-
-def partial_derivative(f, nodal_points, i, j, h):
-    """
-    Computes the partial derivative of f with respect to the i-th coordinate
-    using a centered difference formula with spacing h at the nodal point j.
-    """
-    x = nodal_points[j]
-    stencil = [j-h, j+h]
-    x1 = nodal_points[stencil[0]]
-    x2 = nodal_points[stencil[1]]
-    f1 = f(stencil[0])
-    f2 = f(stencil[1])
-    return (f2[i] - f1[i]) / (x2[i] - x1[i])
-
-# Define the test function
-def f(theta, phi):
-    return np.sin(theta) * np.cos(2*phi)
-
-# Define the analytical derivatives of the test function
-def df_dtheta(theta, phi):
-    return np.cos(theta) * np.cos(2*phi)
-
-def df_dphi(theta, phi):
-    return -2 * np.sin(theta) * np.sin(2*phi)
-
-# Construct the cubed sphere mesh
-n = 32
-nodal_points = cubed_sphere_mesh(n)
-
-# Compute the partial derivatives using the centered difference formula
-h = 2
-df_dtheta_approx = np.array([partial_derivative(f, nodal_points, 0, i, h) for i in range(len(nodal_points))])
-df_dphi_approx = np.array([partial_derivative(f, nodal_points, 1, i, h) for i in range(len(nodal_points))])
-
-# Compute the analytical derivatives of the test function
-df_dtheta_analytical = df_dtheta(nodal_points[:,0], nodal_points)
+# Visualize convergence
+fig = plt.figure()
+ax = fig.add_subplot(111)
+ax.loglog(nhs, errs, '-o')
+ax.set_xlabel('Mesh spacing')
+ax.set_ylabel('Error')
+ax.set_title('Convergence of finite difference stencil')
+plt.show()
