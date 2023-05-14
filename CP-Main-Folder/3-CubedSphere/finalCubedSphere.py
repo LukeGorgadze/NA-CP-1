@@ -70,8 +70,10 @@ def CubedSphere(n, f, point):
         distance = float('inf')
         closestPoint = None
         for face in cubeOrigin:
+            print(face,"\n")
             for row in face:
                 for point in row:
+                    # print(point)
                     lat, longt = cartesian_to_spherical(point[0], point[1], point[2])
                     dist = distanceEstimator(pointOrigin, (lat, longt))
                     if dist < distance:
@@ -90,6 +92,7 @@ def CubedSphere(n, f, point):
     fig, ax = plt.subplots(subplot_kw={'projection': '3d'})
     for face in cubeOrigin:
         for row in face:
+            # print(row,"row")
             X, Y, Z = zip(*row)
             # print(X)
             ax.plot(X, Y, Z, color='red')

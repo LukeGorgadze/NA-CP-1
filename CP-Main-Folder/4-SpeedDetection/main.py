@@ -34,13 +34,9 @@ while True:
     xx2 = 1250
     yy2 = 100
 
-    
     # Convert the frame to grayscale and apply Gaussian blur
     gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
     gray = cv2.GaussianBlur(gray, (5, 5), 0)
-
-    
-    
 
     # Compute the difference between the current and previous frame
     frame_diff = None
@@ -54,7 +50,10 @@ while True:
         thresh = cv2.threshold(frame_diff, 25, 255, cv2.THRESH_BINARY)[1]
 
         # Apply Canny edge detection to the thresholded image
-        edges = cv2.Canny(thresh, 50, 150)
+        # edges = cv2.Canny(thresh, 50, 150)
+
+        # Apply soble edge detection
+        edges = cv2.Laplacian(thresh, cv2.CV_8UC1)
 
         # Find the contours in the edge image
         contours, _ = cv2.findContours(
@@ -99,7 +98,7 @@ while True:
 
     # Display the resulting frame
     if frame_diff is not None:
-        cv2.imshow('frame', frame_diff)
+        cv2.imshow('frame', gray)
         cv2.imshow('frame2', frame)
     
     if cv2.waitKey(1) == ord('q'):
