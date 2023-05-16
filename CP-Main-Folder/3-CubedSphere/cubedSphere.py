@@ -1,62 +1,125 @@
-import numpy as np
+import numpy as np  
 import matplotlib.pyplot as plt
-from mpl_toolkits.mplot3d import Axes3D
 
-# Generate cubed sphere mesh
-n = 10  # number of grid points along each face
-m = 6*n**2  # total number of grid points
-theta = np.linspace(0, np.pi, n+1)[1:-1]  # exclude poles
-phi = np.linspace(0, 2*np.pi, n+1)[:-1]
-x, y = np.meshgrid(phi, theta)
-x = x.flatten()
-y = y.flatten()
-z = np.sqrt(1 - x**2 - y**2)
-xyz = np.vstack([np.concatenate([x, -x, -y, y, -z, z]),
-                 np.concatenate([y, -y, x, -x, -z, z]),
-                 np.concatenate([z, z, z, z, -x, -x])]).T
+def CartToSpheric(x, y, z):
+        r = np.sqrt(x**2 + y**2 + z**2)
+        theta = np.arccos(z / r)
+        phi = np.arctan2(y, x) 
+        return theta, phi   
 
-# Compute finite difference stencil for partial derivative
-h = np.sqrt(2/(n**2))  # mesh spacing
-D = np.zeros((m, m))
-for i in range(m):
-    xi = xyz[i,:]
-    for j in range(m):
-        xj = xyz[j,:]
-        if np.allclose(xi, xj):
-            continue  # ignore diagonal
-        xij = xj - xi
-        r = np.linalg.norm(xij)
-        if r > 2*h:
-            continue  # ignore points too far away
-        D[i,j] = np.dot(xij, np.array([1,2,3]))/(r**3)
+def CubeToSphere(n, f, point):
+    X = np.linspace(-1, 1, n)
+    Y = np.linspace(-1, 1, n)
+    origin = []
+    mainOrigin = []
 
-# Define test function and analytical partial derivatives
-f = lambda x,y,z: np.sin(2*x)*np.cos(y)*z
-dfdx = lambda x,y,z: 2*np.cos(2*x)*np.cos(y)*z
-dfdy = lambda x,y,z: -np.sin(2*x)*np.sin(y)*z
-dfdz = lambda x,y,z: np.sin(2*x)*np.cos(y)
+    for x in X:
+        row = []
+        for y in Y:
+            row.append([x, y, 1] / np.sqrt(x**2 + y**2 + 1))
+        origin.append(row)
+    mainOrigin.append(origin)
 
-# Compute numerical partial derivatives for varying mesh spacing
-nhs = np.logspace(-2, -6, 10)  # array of mesh spacings
-errs = np.zeros_like(nhs)  # array of errors
-for i, h in enumerate(nhs):
-    Dh = D/h
-    vals = f(xyz[:,0], xyz[:,1], xyz[:,2])
-    dfdx_num = np.dot(Dh, vals)
-    dfdy_num = np.dot(Dh, vals)
-    dfdz_num = np.dot(Dh, vals)
-    dfdx_analytic = dfdx(xyz[:,0], xyz[:,1], xyz[:,2])
-    dfdy_analytic = dfdy(xyz[:,0], xyz[:,1], xyz[:,2])
-    dfdz_analytic = dfdz(xyz[:,0], xyz[:,1], xyz[:,2])
-    errs[i] = np.sqrt(np.mean((dfdx_num - dfdx_analytic)**2 +
-                               (dfdy_num - dfdy_analytic)**2 +
-                               (dfdz_num - dfdz_analytic)**2))
+    origin = []
+    for x in X:
+        row = []
+        for y in Y:
+            row.append([x, y, -1] / np.sqrt(x**2 + y**2 + 1))
+        origin.append(row)
+    mainOrigin.append(origin)
 
-# Visualize convergence
-fig = plt.figure()
-ax = fig.add_subplot(111)
-ax.loglog(nhs, errs, '-o')
-ax.set_xlabel('Mesh spacing')
-ax.set_ylabel('Error')
-ax.set_title('Convergence of finite difference stencil')
-plt.show()
+    origin = []
+    for x in X:
+        row = []
+        for y in Y:
+            row.append([-1, x, y] / np.sqrt(x**2 + y**2 + 1))
+        origin.append(row)
+    mainOrigin.append(origin)
+
+    origin = []
+    for x in X:
+        row = []
+        for y in Y:
+            row.append([1, x, y] / np.sqrt(x**2 + y**2 + 1))
+        origin.append(row)
+    mainOrigin.append(origin)
+
+    origin = []
+    for x in X:
+        row = []
+        for y in Y:
+            row.append([x, -1, y] / np.sqrt(x**2 + y**2 + 1))
+        origin.append(row)
+    mainOrigin.append(origin)
+
+    origin = []
+    for x in X:
+        row = []
+        for y in Y:
+            row.append([x, 1, y] / np.sqrt(x**2 + y**2 + 1))
+        origin.append(row)
+    mainOrigin.append(origin)
+
+    
+
+    def sphereDistance(point1, point2):
+        p1_lat, p1_lon = point1
+        p2_lat, p2_lon = point2
+
+        delta_lat = p2_lat - p1_lat
+        delta_lon = p2_lon - p1_lon
+
+        haversin_lat = np.sin(delta_lat / 2) ** 2
+        haversin_lon = np.sin(delta_lon / 2) ** 2
+
+        cos_p1_lat = np.cos(p1_lat)
+        cos_p2_lat = np.cos(p2_lat)
+
+        haversin_sum = haversin_lat + cos_p1_lat * cos_p2_lat * haversin_lon
+
+        distance = 2 * np.arcsin(np.sqrt(haversin_sum))
+
+        return distance 
+
+    def calcDerivative(f, po, dir, h):
+        minDistance = float('inf')
+        closestPoint = None
+        for face in mainOrigin:
+            for row in face:
+                for point in row:
+                    lat, longt = CartToSpheric(point[0], point[1], point[2])
+                    currDist = sphereDistance(po, (lat, longt))
+                    if currDist < minDistance:
+                        minDistance = currDist
+                        closestPoint = point
+        if dir == 'x':
+            return (f(closestPoint[0] + h, closestPoint[1],closestPoint[2]) - f(closestPoint[0], closestPoint[1],closestPoint[2])) / h
+        if dir == 'y':
+            return (f(closestPoint[0], closestPoint[1] + h,closestPoint[2]) - f(closestPoint[0], closestPoint[1],closestPoint[2])) / h
+        if dir == 'z':
+            return (f(closestPoint[0], closestPoint[1],closestPoint[2] + h) - f(closestPoint[0], closestPoint[1],closestPoint[2])) / h
+        else:
+            return None
+
+
+    print(calcDerivative(f, point, 'x', 0.0001))
+    fig = plt.figure()
+    ax = plt.axes(projection='3d')
+    
+    xdata = []
+    ydata = []
+    zdata = []
+    for face in mainOrigin:
+        for row in face:
+            for point in row:
+                xdata.append(point[0])
+                ydata.append(point[1])
+                zdata.append(point[2])
+    ax.scatter3D(xdata, ydata, zdata);
+    plt.show()
+    
+
+def f(x, y, z): return np.exp(x) + np.exp(y) + np.cos(x) + np.sin(y) + np.sin(z)
+x,z,y = 10,10,10
+latitude,longtitude = CartToSpheric(x,y,z)
+CubeToSphere(10, f, (latitude,longtitude))

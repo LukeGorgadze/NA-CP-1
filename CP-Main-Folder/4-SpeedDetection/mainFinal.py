@@ -54,7 +54,7 @@ while True:
         frame_diff = cv2.GaussianBlur(frame_diff, (7, 7), 0)
 
         # Step 4 Find the contours in the edge image
-        contours, _ = cv2.findContours(
+        contours, _ = cv2.findTheContours(
             frame_diff.copy(), cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
 
         # Step 5 Iterate through the contours and find the car
@@ -121,3 +121,42 @@ print(30 / moveTime * 3.6, "KM / H")
 # Release the video capture and destroy all windows
 cap.release()
 cv2.destroyAllWindows()
+
+
+import numpy as np
+
+def findTheContours(image):
+    rows, cols = image.shape
+    visited = np.zeros((rows, cols), dtype=np.uint8)
+    contours = []
+    
+    def find_neighbor_pixels(row, col):
+        neighbors = []
+        for i in range(-1, 2):
+            for j in range(-1, 2):
+                new_row = row + i
+                new_col = col + j
+                if (new_row >= 0 and new_row < rows and new_col >= 0 and new_col < cols
+                        and image[new_row, new_col] != 0 and visited[new_row, new_col] == 0):
+                    neighbors.append((new_row, new_col))
+        return neighbors
+    
+    def traverse_contour(row, col):
+        contour = []
+        stack = [(row, col)]
+        while stack:
+            curr_row, curr_col = stack.pop()
+            if visited[curr_row, curr_col] == 0:
+                visited[curr_row, curr_col] = 1
+                contour.append((curr_row, curr_col))
+                neighbors = find_neighbor_pixels(curr_row, curr_col)
+                stack.extend(neighbors)
+        return contour
+    
+    for row in range(rows):
+        for col in range(cols):
+            if image[row, col] != 0 and visited[row, col] == 0:
+                contour = traverse_contour(row, col)
+                contours.append(contour)
+    
+    return contours
